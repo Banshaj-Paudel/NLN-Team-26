@@ -23,3 +23,8 @@ class UserRiskHistoryAPIView(APIView):
         )
         serializer = RiskHistoryItemSerializer(checkins, many=True)
         return Response({"user_id": user_id, "history": serializer.data}, status=status.HTTP_200_OK)
+
+
+class OnboardingSaveAPIView(APIView):
+    def post(self, request):
+        return Response({"ok": True, "received": request.data}, status=status.HTTP_200_OK)
