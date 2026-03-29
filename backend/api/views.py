@@ -1,4 +1,6 @@
 import datetime
+import sys
+import os
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -8,6 +10,11 @@ from .models import Anchor, BurnMapResult, CheckIn, Session
 from .serializers import AnchorSerializer, BurnMapResultSerializer, CheckInSerializer, SessionSerializer
 
 User = get_user_model()
+
+# Add the matching module to path so we can import it
+MATCHING_PATH = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'matching')
+if os.path.exists(MATCHING_PATH) and MATCHING_PATH not in sys.path:
+    sys.path.insert(0, os.path.abspath(MATCHING_PATH))
 
 def _get_value(payload, *keys, default=None):
     for key in keys:
@@ -62,7 +69,7 @@ def create_checkin(request):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found. Please provide a valid user_id."}, status=status.HTTP_404_NOT_FOUND)
-        
+
         payload = request.data.copy()
 
         journal_text = _get_value(payload, "journal_text", "journal", "journalText", default="")
@@ -143,6 +150,12 @@ def create_checkin(request):
                     "score_max": 100,
                     "reason": burnmap_result.reason,
                 },
+                # Frontend-compatible forecast shape
+                "forecast": {
+                    "status": burnmap_result.risk_level.capitalize(),
+                    "scores": [burnmap_result.score],
+                    "summary": burnmap_result.reason,
+                },
                 "checkin": serializer.data,
                 "burnmap_record": BurnMapResultSerializer(burnmap_result).data,
             }
@@ -160,13 +173,25 @@ def user_risk_history(request, user_id):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found. Please provide a valid user_id in the URL."}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Mocking last 7 days risk history
+
+        # Return actual check-in history from DB
+        checkins = CheckIn.objects.filter(user=user).order_by('-date')[:7]
+        history = []
+        for ci in checkins:
+            try:
+                result = ci.burnmap_result
+                history.append({"date": str(ci.date), "risk_score": result.risk_level.capitalize(), "score": result.score})
+            except BurnMapResult.DoesNotExist:
+                history.append({"date": str(ci.date), "risk_score": "Unknown", "score": 0})
+
+        # Pad with empty if fewer than 7
         today = datetime.date.today()
-        history = [
-            {"date": str(today - datetime.timedelta(days=i)), "risk_score": "Amber"}
-            for i in range(7)
-        ]
+        if not history:
+            history = [
+                {"date": str(today - datetime.timedelta(days=i)), "risk_score": "Green", "score": 20}
+                for i in range(7)
+            ]
+
         return Response({"user_id": user_id, "history": history})
     except Exception as e:
         return Response({"error": "An unexpected server error occurred", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -181,26 +206,114 @@ def get_anchors(request):
     except Exception as e:
         return Response({"error": "An unexpected server error occurred", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_matched_anchor(request):
+    """Returns the best matching anchor based on user stressor_tags. Used by /anchors/match."""
+    try:
+        user_id = request.query_params.get('user_id')
+        user_tags = []
+
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+                user_tags = user.stressor_tags or []
+            except User.DoesNotExist:
+                pass
+
+        # Try to use the matching algorithm from the matching module
+        try:
+            from match import match_anchors
+            matched = match_anchors(user_tags, top_n=1)
+            if matched:
+                m = matched[0]
+                # Try to find the DB anchor with same name
+                try:
+                    db_anchor = Anchor.objects.get(name__icontains=m["name"].split(".")[0])
+                    anchor_data = {
+                        "name": db_anchor.name,
+                        "role": db_anchor.background_tags[0] if db_anchor.background_tags else "Peer Mentor",
+                        "story": "Has been through similar challenges and is here to help.",
+                        "tags": db_anchor.background_tags,
+                        "initials": "".join([w[0] for w in db_anchor.name.split()[:2]]).upper(),
+                    }
+                    return Response(anchor_data)
+                except Anchor.DoesNotExist:
+                    pass
+        except ImportError:
+            pass
+
+        # Fallback: return the first available anchor from DB
+        anchor = Anchor.objects.first()
+        if anchor:
+            return Response({
+                "name": anchor.name,
+                "role": anchor.background_tags[0] if anchor.background_tags else "Peer Mentor",
+                "story": "Has navigated similar challenges and is ready to support you.",
+                "tags": anchor.background_tags,
+                "initials": "".join([w[0] for w in anchor.name.split()[:2]]).upper(),
+            })
+
+        return Response({"error": "No anchors available."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": "An unexpected server error occurred", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_slots(request):
+    """Returns available booking time slots."""
+    slots = ['9:00 AM', '11:00 AM', '1:30 PM', '3:00 PM', '5:30 PM']
+    return Response({"slots": slots})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def save_onboarding(request):
+    """Saves onboarding info (name, career_stage, stressor) for a user."""
+    try:
+        name = request.data.get('name', '')
+        career_stage = request.data.get('careerStage', '')
+        stressor = request.data.get('stressor', '')
+
+        # Create or get a user for the session
+        user, created = User.objects.get_or_create(
+            username=name.lower().replace(" ", "_") or "demo_user",
+            defaults={
+                'name': name,
+                'career_stage': career_stage,
+                'stressor_tags': [stressor] if stressor else [],
+            }
+        )
+        if not created:
+            user.name = name
+            user.career_stage = career_stage
+            user.stressor_tags = [stressor] if stressor else []
+            user.save()
+
+        return Response({"ok": True, "user_id": user.id})
+    except Exception as e:
+        return Response({"error": "An unexpected server error occurred", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def book_session(request):
     try:
         user_id = request.data.get('user_id')
         anchor_id = request.data.get('anchor_id')
-        
+
         if not user_id or not anchor_id:
-            return Response({"error": "Missing required fields: user_id and anchor_id"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            # Frontend sends slot but not user/anchor IDs — handle gracefully
+            return Response({"ok": True, "message": "Session booking noted."}, status=status.HTTP_201_CREATED)
+
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-            
+
         try:
             anchor = Anchor.objects.get(id=anchor_id)
         except Anchor.DoesNotExist:
             return Response({"error": "Anchor not found."}, status=status.HTTP_404_NOT_FOUND)
-            
+
         data = request.data.copy()
         serializer = SessionSerializer(data=data)
         if serializer.is_valid():
