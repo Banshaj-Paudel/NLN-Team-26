@@ -97,7 +97,11 @@ const challenges = [
   },
 ];
 
-function BurnMapLanding() {
+type BurnMapLandingProps = {
+  onLaunch?: () => void;
+};
+
+function BurnMapLanding({ onLaunch }: BurnMapLandingProps) {
   return (
     <div className="burnmap">
       <header className="topbar">
@@ -122,7 +126,9 @@ function BurnMapLanding() {
             </p>
             <h1 className="hero-title">
               <span className="headline-strong">Spot burnout early.</span>
-              <span className="headline-soft">Connect with someone who's been there.</span>
+              <span className="headline-soft">
+                Connect with someone who's been there.
+              </span>
             </h1>
             <p className="lead">
               BurnMap watches the quiet signals of overload, forecasts risk
@@ -130,7 +136,9 @@ function BurnMapLanding() {
               Anchors who have lived the same pressure.
             </p>
             <div className="cta-row">
-              <Button variant="primary">Start a forecast</Button>
+              <Button variant="primary" onClick={onLaunch}>
+                Start a forecast
+              </Button>
               <Button variant="secondary">Meet the Anchors</Button>
             </div>
             <div className="signal-grid">
