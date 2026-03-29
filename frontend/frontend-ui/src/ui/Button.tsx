@@ -7,9 +7,11 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   compact?: boolean
 }
 
-function Button({ variant = 'primary', compact = false, className = '', ...props }: ButtonProps) {
-  const classes = [variant, compact ? 'compact' : '', className].filter(Boolean).join(' ')
-  return <button className={classes} {...props} />
+function Button({ variant = 'primary', compact = false, className = '', type, ...props }: ButtonProps) {
+  const classes = ['btn', variant, compact ? 'compact' : '', className]
+    .filter(Boolean)
+    .join(' ')
+  return <button className={classes} type={type ?? 'button'} {...props} />
 }
 
 export default Button
