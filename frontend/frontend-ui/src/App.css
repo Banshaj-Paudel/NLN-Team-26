@@ -133,6 +133,15 @@ main {
   margin: 16px 0;
 }
 
+.hero-title span {
+  display: block;
+}
+
+.headline-soft {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .hero-copy .lead {
   font-size: 1.1rem;
   color: var(--muted);
