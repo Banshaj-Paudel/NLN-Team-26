@@ -1,68 +1,56 @@
+import pickle
+import os
+import numpy as np
+
+# Load trained model
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
+with open(MODEL_PATH, "rb") as f:
+    model = pickle.load(f)
+
+LEVEL_MAP = {0: "green", 1: "amber", 2: "red"}
+REASON_MAP = {
+    "green": "Stress levels manageable. Keep maintaining your current habits.",
+    "amber": "Burnout risk building up. You're in the early warning window — act now before it worsens.",
+    "red": "Critical stress signals across sleep, mood, and productivity. Immediate recovery needed."
+}
+
 def predict_risk(sleep_hours: float, mood_score: int,
                  tasks_completion_rate: float, days_in_stress: int) -> dict:
-    score = 0
 
-    # Sleep (max 30 pts)
-    if sleep_hours < 5:
-        score += 30
-    elif sleep_hours < 6.5:
-        score += 20
-    elif sleep_hours < 7.5:
-        score += 10
+    features = np.array([[sleep_hours, mood_score, tasks_completion_rate, days_in_stress]])
+    prediction = model.predict(features)[0]
+    probability = model.predict_proba(features)[0]
+    score = int(round(max(probability) * 100))
+    level = LEVEL_MAP[prediction]
 
-    # Mood (max 30 pts)
-    mood_map = {1: 30, 2: 22, 3: 14, 4: 6, 5: 0}
-    score += mood_map.get(mood_score, 0)
-
-    # Task completion (max 25 pts)
-    if tasks_completion_rate < 0.3:
-        score += 25
-    elif tasks_completion_rate < 0.6:
-        score += 15
-    elif tasks_completion_rate < 0.8:
-        score += 7
-
-    # Consecutive stress days (max 15 pts)
-    if days_in_stress >= 5:
-        score += 15
-    elif days_in_stress >= 3:
-        score += 8
-    elif days_in_stress >= 1:
-        score += 3
-
-    if score >= 60:
-        level = "red"
-        reason = "Critical stress signals across sleep, mood, and productivity. Immediate recovery needed."
-    elif score >= 35:
-        level = "amber"
-        reason = "Burnout risk building up. You're in the early warning window — act now before it worsens."
-    else:
-        level = "green"
-        reason = "Stress levels manageable. Keep maintaining your current habits."
-
-    return {"risk_level": level, "score": score, "reason": reason}
-
-
-if __name__ == "__main__":
-    # GREEN
-    print(predict_risk(8.0, 5, 0.95, 0))
-    # AMBER
-    print(predict_risk(6.0, 3, 0.5, 3))
-    # RED
-    print(predict_risk(4.0, 1, 0.2, 6))
-
+    return {
+        "risk_level": level,
+        "score": score,
+        "reason": REASON_MAP[level],
+        "feature_importance": {
+            "mood_score": "35.8%",
+            "sleep_hours": "26.5%",
+            "days_in_stress": "19.0%",
+            "tasks_completion_rate": "18.7%"
+        }
+    }
 
 def run_auto_check():
     """
-    This is what gets called in the real app.
-    No user input needed — data comes from the watch.
+    In production pulls from Apple HealthKit / Google Fit / Calendar.
+    For demo: uses mock watch data.
     """
     from data_fetcher import get_watch_data
     data = get_watch_data()
-    result = predict_risk(
+    return predict_risk(
         sleep_hours=data["sleep_hours"],
         mood_score=data["mood_score"],
         tasks_completion_rate=data["tasks_completion_rate"],
         days_in_stress=data["days_in_stress"]
     )
-    return result
+
+
+if __name__ == "__main__":
+    print(predict_risk(8.0, 5, 0.95, 0))
+    print(predict_risk(6.0, 3, 0.5, 3))
+    print(predict_risk(4.0, 1, 0.2, 6))
