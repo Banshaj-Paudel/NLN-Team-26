@@ -3,7 +3,7 @@
 ## Team
 | Dev | Role | Folder |
 |-----|------|--------|
-| Dev 1 (Lead) | ML Service | `/ml-service` |
+| Dev 1 | ML Service | `/ml-service` |
 | Dev 2 | Backend | `/backend` |
 | Dev 3 | Frontend | `/frontend` |
 | Dev 4 | Matching | `/matching` |
