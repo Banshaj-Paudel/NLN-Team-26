@@ -24,10 +24,18 @@ class Command(BaseCommand):
         
         # Create anchors
         anchors_data = [
-            {"name": "Alice Johnson", "tags": ["Software Engineer", "Burnout Survivor"]},
-            {"name": "Bob Smith", "tags": ["Product Manager", "Career Transition"]},
-            {"name": "Charlie Davis", "tags": ["Final year CS", "Job rejection"]},
-            {"name": "Diana Ross", "tags": ["Startup stress", "Founder"]},
+            {"name": "Alice Johnson", "tags": ["Software Engineer", "Burnout Survivor", "Tech"]},
+            {"name": "Bob Smith", "tags": ["Product Manager", "Career Transition", "Leadership"]},
+            {"name": "Charlie Davis", "tags": ["Final year CS", "Job rejection", "Academics"]},
+            {"name": "Diana Ross", "tags": ["Startup stress", "Founder", "Entrepreneurship"]},
+            {"name": "Evan Wright", "tags": ["Data Scientist", "Imposter Syndrome", "Tech"]},
+            {"name": "Fiona Gallagher", "tags": ["Medical Student", "Clinical Rotations", "High Pressure"]},
+            {"name": "George King", "tags": ["First Job", "Workplace Politics", "Corporate"]},
+            {"name": "Helen Keller", "tags": ["Career Changer", "Bootcamp Grad", "Job Search"]},
+            {"name": "Ian Somerhalder", "tags": ["Freelancer", "Financial Anxiety", "Remote Work"]},
+            {"name": "Jessica Day", "tags": ["Teacher", "Academic Pressure", "Burnout"]},
+            {"name": "Kevin Malone", "tags": ["Accountant", "Busy Season", "Long Hours"]},
+            {"name": "Laura Palmer", "tags": ["Graduate Student", "Thesis Stress", "Academics"]}
         ]
         
         for data in anchors_data:
