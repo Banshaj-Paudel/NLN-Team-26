@@ -56,7 +56,7 @@ class SessionSlotsAPIView(APIView):
 class SessionBookCompatAPIView(APIView):
     def post(self, request):
         slot = request.data.get("slot") if isinstance(request.data, dict) else None
-        slot = sanitize_text(slot, max_length=64) if slot is not None else None
+        slot = sanitize_text(slot, max_length=64)
         if not slot:
             return Response({"detail": "slot is required."}, status=status.HTTP_400_BAD_REQUEST)
 
