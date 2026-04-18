@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.anchors.models import Anchor
+from apps.security import sanitize_text
 from .models import AnchorSession
 from .serializers import AnchorSessionSerializer, SessionBookingSerializer
 
@@ -15,10 +16,11 @@ class SessionBookAPIView(APIView):
 
         # Frontend compatibility mode: accepts only a selected slot string.
         if "slot" in payload and not {"user_id", "anchor_id", "scheduled_for"}.issubset(payload.keys()):
+            slot = sanitize_text(payload.get("slot"), max_length=64)
             return Response(
                 {
                     "status": "booked",
-                    "slot": payload.get("slot"),
+                    "slot": slot,
                     "scheduled_for": timezone.now().isoformat(),
                 },
                 status=status.HTTP_201_CREATED,
@@ -54,6 +56,7 @@ class SessionSlotsAPIView(APIView):
 class SessionBookCompatAPIView(APIView):
     def post(self, request):
         slot = request.data.get("slot") if isinstance(request.data, dict) else None
+        slot = sanitize_text(slot, max_length=64)
         if not slot:
             return Response({"detail": "slot is required."}, status=status.HTTP_400_BAD_REQUEST)
 
